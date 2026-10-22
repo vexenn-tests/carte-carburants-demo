@@ -16,7 +16,7 @@
     --muted: #898781;
     --line: #e7e6e0;
     --border: rgba(11,11,11,0.12);
-    --brand: #4742FF; /* bleu 20 Minutes */
+    --brand: #4742FF;
     --accent-soft: #ecebff;
     --accent-ink: #2f2ad6;
     --good: #0ca30c;
@@ -30,7 +30,6 @@
   .leaflet-container { font-family: var(--font); }
   main { max-width: 1100px; margin: 0 auto; padding: 12px 16px 24px; }
 
-  /* One-line toolbar */
   .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
   .field, .bar select {
     font: inherit; color: var(--text-primary); background: var(--surface-2);
@@ -59,7 +58,6 @@
   .suggest .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .suggest .code { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 
-  /* Map */
   .map-box { position: relative; height: min(70vh, 620px); min-height: 420px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); background: var(--surface-2); }
   #map { position: absolute; inset: 0; background: var(--surface-2); }
   .leaflet-tile-pane { filter: grayscale(.85) contrast(.95) brightness(1.04); }
@@ -74,13 +72,11 @@
   .spinner { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--accent-soft); border-top-color: var(--brand); animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* Overlays on the map */
   .summary { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 800; max-width: calc(100% - 24px);
     background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 7px 16px; box-shadow: var(--shadow);
     font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .summary b { color: var(--text-primary); font-size: 16px; font-variant-numeric: tabular-nums; margin-right: 3px; }
 
-  /* Bubbles (groups of stations) and single stations */
   .cluster {
     display: flex; align-items: center; justify-content: center; border-radius: 50%;
     font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; border: 2px solid #fff; transition: transform .15s;
@@ -90,7 +86,6 @@
   .dot.old { background: #fff !important; border: 2px solid #9a988f; box-shadow: none; }
   .dot:hover { transform: scale(1.3); }
 
-  /* Statistics under the map */
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
   @media (max-width: 640px) { .stats { grid-template-columns: 1fr; } }
   .stat { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; text-align: left; font: inherit; color: inherit; }
@@ -111,7 +106,6 @@
   .legend .stale { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid #9a988f; background: #fff; }
   @media (max-width: 640px) { .legend { display: none; } }
 
-  /* Popup */
   .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 0; }
   .leaflet-popup-content { margin: 0; width: 250px !important; font: 13px/1.4 var(--font); }
   .leaflet-container a.leaflet-popup-close-button { color: var(--muted); top: 8px; right: 8px; }
@@ -185,8 +179,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 <script>
-// Fichier produit toutes les heures par fetch_carburants.py (chemin relatif à cette page, ou URL complète).
-// S'il est absent ou date de plus de 3 h, la carte lit directement l'API du ministère.
 const DATA_URL = 'carburants-data.json';
 const MAX_FILE_AGE = 3 * 3600e3;
 const API = 'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2';
@@ -196,7 +188,6 @@ const FUELS = [
 ];
 const METROPOLE = [[41.3, -5.2], [51.1, 9.6]];
 const STALE_DAYS = 7;
-// Price colours against the national average of the selected fuel, in standard deviations.
 const PRICE_BINS = [
   { max: -1, color: '#1c5cab' },
   { max: -1 / 3, color: '#86b6ef' },
@@ -207,8 +198,6 @@ const PRICE_BINS = [
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-// Search-friendly form: no accents, no capitals; hyphens, apostrophes and spaces all become one space;
-// "st"/"ste" are read as "saint"/"sainte".
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   .replace(/[-'’\s]+/g, ' ').trim()
   .replace(/\bste\b/g, 'sainte').replace(/\bst\b/g, 'saint');
@@ -217,24 +206,19 @@ const fmt = n => n.toLocaleString('fr-FR');
 const euro = p => p.toLocaleString('fr-FR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) + ' €';
 const cents = d => (d >= 0 ? '+' : '−') + Math.abs(d * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' cts';
 
-// fuelIdx = -1 means "all fuels": every station, in brand colour, no price comparison.
 let stations = [], shown = [], fuelIdx = -1, fuelStats = null, place = null, zoneMin = null, zoneMax = null;
 const ALL = () => fuelIdx < 0;
-// Fuels summarised under the map in "all fuels" mode: Gazole, E10, SP98.
 const OVERVIEW_FUELS = [0, 2, 3];
 
 const price = (s, i = fuelIdx) => s.prix[i];
 const isFresh = (s, i = fuelIdx) => i >= 0 && s.prix[i] != null && s.maj[i] && (Date.now() - s.maj[i]) / 864e5 <= STALE_DAYS;
 
-// Map
-// Quarter-step zoom so metropolitan France fills the frame instead of snapping one level out.
 const map = L.map('map', { zoomControl: false, zoomSnap: 0.25 }).fitBounds(METROPOLE, { padding: [10, 10] });
 L.control.zoom({ position: 'topright', zoomInTitle: 'Zoomer', zoomOutTitle: 'Dézoomer' }).addTo(map);
 L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}', {
   maxZoom: 19, attribution: '&copy; <a href="https://www.ign.fr/">IGN</a> – Géoplateforme',
 }).addTo(map);
 new ResizeObserver(() => map.invalidateSize()).observe($('map'));
-// Big bubbles group nearby stations; each bubble takes the colour of its stations' average price.
 const clusters = L.markerClusterGroup({
   chunkedLoading: true,
   showCoverageOnHover: false,
@@ -271,7 +255,6 @@ function renderLegend() {
        <div class="legend-row"><span class="stale"></span> Prix de plus de ${STALE_DAYS} jours</div>`;
 }
 
-// Colours
 function computeFuelStats() {
   if (ALL()) { fuelStats = null; return; }
   const ps = stations.filter(s => isFresh(s)).map(s => price(s));
@@ -280,10 +263,8 @@ function computeFuelStats() {
   fuelStats = { mean, sd };
 }
 const colorFor = p => PRICE_BINS.find(b => (fuelStats.sd ? (p - fuelStats.mean) / fuelStats.sd : 0) < b.max).color;
-// Light colours need dark text inside bubbles.
 const LIGHT_BINS = new Set(['#86b6ef', '#b8b6ad', '#f09a99']);
 
-// One icon per colour, shared by all stations.
 const iconCache = new Map();
 function iconFor(s) {
   const key = ALL() ? '#4742FF' : isFresh(s) ? colorFor(price(s)) : 'old';
@@ -305,14 +286,12 @@ function render() {
   updateZone();
 }
 
-// Count and price statistics of the visible area; they follow every move and zoom.
 function updateZone() {
   const b = map.getBounds();
   const inZone = shown.filter(s => b.contains(s.marker.getLatLng()));
   $('summary').innerHTML = `<b>${fmt(inZone.length)}</b> station${inZone.length > 1 ? 's' : ''} dans la zone`;
   zoneMin = zoneMax = null;
 
-  // "All fuels": three cards with the average price of the main fuels in the zone.
   const cards = [['st-avg'], ['st-min'], ['st-max']].map(([id]) => $(id));
   if (ALL()) {
     OVERVIEW_FUELS.forEach((fi, k) => {
@@ -356,7 +335,6 @@ function updateZone() {
 }
 map.on('moveend', updateZone);
 
-// Clicking the cheapest / priciest station opens its bubble if needed, then its card.
 for (const [id, get] of [['st-min', () => zoneMin], ['st-max', () => zoneMax]]) {
   $(id).addEventListener('click', () => {
     const s = get();
@@ -364,7 +342,6 @@ for (const [id, get] of [['st-min', () => zoneMin], ['st-max', () => zoneMax]]) 
   });
 }
 
-// Popup
 function ago(ms) {
   const h = (Date.now() - ms) / 36e5;
   return h < 1 ? '< 1 h' : h < 48 ? `${Math.round(h)} h` : `${Math.round(h / 24)} j`;
@@ -387,7 +364,6 @@ function popupHtml(s) {
     <div class="pop-body">${rows}</div>`;
 }
 
-// Location: one search field for postal codes, communes, départements and regions. It only moves the map.
 function zoomToArea() {
   const area = !place ? [] : stations.filter(s =>
     place.kind === 'reg' ? s.region === place.name :
@@ -409,7 +385,6 @@ function buildPlaces() {
   places = [...seen.values()].sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || (a.cp || '').localeCompare(b.cp || ''));
 }
 
-// Names match at the start of any word ("seine" finds Hauts-de-Seine), with or without spaces ("valdemarne").
 const wordStart = (n, q) => n.startsWith(q) || n.includes(' ' + q) || compact(n).startsWith(compact(q));
 
 function matches(v) {
@@ -426,7 +401,6 @@ const placeTag = p => p.kind === 'reg' ? 'Région' : p.kind === 'dep' ? 'Départ
 function showSuggest() {
   const v = $('q').value.trim();
   let m = matches(v).slice(0, 8);
-  // A complete postal code with a single commune needs no list.
   if (m.length === 1 && m[0].cp === v) m = [];
   qActive = -1;
   const list = $('q-list');
@@ -448,7 +422,6 @@ $('q').addEventListener('input', e => {
   const v = e.target.value.trim();
   $('clear-q').hidden = !v;
   showSuggest();
-  // Typing digits filters as you go (e.g. "33" = Gironde); a commune name needs a pick from the list.
   clearTimeout(qTimer);
   if (/^\d{2,5}$/.test(v)) qTimer = setTimeout(() => { place = { kind: 'commune', cp: v }; zoomToArea(); }, 350);
   else if (!v) { place = null; zoomToArea(); }
@@ -492,7 +465,6 @@ $('fuel').addEventListener('change', e => {
   render();
 });
 
-// Data
 const fuelsFromMask = mask => FUELS.filter((_, i) => mask & (1 << i)).map(([, label]) => label);
 
 function makeStation(s, lat, lon) {
@@ -501,7 +473,6 @@ function makeStation(s, lat, lon) {
   return s;
 }
 
-// Source 1: the data file written every hour by fetch_carburants.py.
 async function loadFromFile() {
   const res = await fetch(DATA_URL, { cache: 'no-cache' });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -514,7 +485,6 @@ async function loadFromFile() {
   return data.source_maj || data.genere_le;
 }
 
-// Source 2 (fallback): the government API directly, in a single export call.
 async function loadFromApi() {
   const select = ['id', 'ville', 'cp', 'adresse', 'geom', 'region', 'departement',
     ...FUELS.flatMap(([f]) => [`${f}_prix`, `${f}_maj`])].join(',');
