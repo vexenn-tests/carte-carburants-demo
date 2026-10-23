@@ -378,8 +378,8 @@ for (const [id, get] of [['st-min', () => zoneMin], ['st-max', () => zoneMax]]) 
   });
 }
 
-const CHEAP_STEP = 10;
-let cheapLimit = CHEAP_STEP, cheapItems = [];
+const CHEAP_FIRST = 10, CHEAP_MORE = 5;
+let cheapLimit = CHEAP_FIRST, cheapItems = [];
 
 function cheapRow(i, lead, s, fi) {
   const maj = s.maj[fi];
@@ -424,7 +424,7 @@ $('cheap-list').addEventListener('click', e => {
   clusters.zoomToShowLayer(s.marker, () => s.marker.openPopup());
 });
 $('cheap-more').addEventListener('click', () => {
-  cheapLimit += CHEAP_STEP;
+  cheapLimit += CHEAP_MORE;
   updateZone();
 });
 
@@ -560,7 +560,7 @@ $('fuel').innerHTML = `<option value="-1">Tous les carburants</option>` +
   FUELS.map(([, label], i) => `<option value="${i}">${label}</option>`).join('');
 $('fuel').addEventListener('change', e => {
   fuelIdx = +e.target.value;
-  cheapLimit = CHEAP_STEP;
+  cheapLimit = CHEAP_FIRST;
   engage();
   map.closePopup();
   computeFuelStats();
