@@ -127,6 +127,7 @@
   .price.none .fuel, .price.none .amount { color: var(--muted); font-weight: 400; }
   .vs { grid-column: 1 / -1; font-size: 11px; color: var(--text-secondary); margin-top: -3px; }
 
+  .cheap[hidden] { display: none; }
   .cheap { margin-top: 10px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
   .cheap-title { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
   .cheap-list { list-style: none; margin: 0; padding: 0; }
@@ -189,7 +190,7 @@
     </button>
   </div>
 
-  <section class="cheap" aria-live="polite">
+  <section class="cheap" id="cheap" aria-live="polite" hidden>
     <h2 class="cheap-title" id="cheap-title">Les moins chers dans la zone</h2>
     <ol class="cheap-list" id="cheap-list"></ol>
     <button class="cheap-more" id="cheap-more" hidden>Afficher plus</button>
@@ -419,6 +420,19 @@ $('cheap-more').addEventListener('click', () => {
   updateZone();
 });
 
+let engaged = false;
+function engage() {
+  if (engaged) return;
+  engaged = true;
+  $('cheap').hidden = false;
+}
+map.on('dragstart', engage);
+map.getContainer().addEventListener('wheel', engage, { passive: true });
+map.getContainer().addEventListener('touchstart', engage, { passive: true });
+map.getContainer().querySelector('.leaflet-control-zoom').addEventListener('click', engage);
+clusters.on('clusterclick', engage);
+clusters.on('click', engage);
+
 function ago(ms) {
   const h = (Date.now() - ms) / 36e5;
   return h < 1 ? '< 1 h' : h < 48 ? `${Math.round(h)} h` : `${Math.round(h / 24)} j`;
@@ -442,6 +456,7 @@ function popupHtml(s) {
 }
 
 function zoomToArea() {
+  if (place) engage();
   const area = !place ? [] : stations.filter(s =>
     place.kind === 'reg' ? s.region === place.name :
     place.kind === 'dep' ? s.departement === place.name :
@@ -538,6 +553,7 @@ $('fuel').innerHTML = `<option value="-1">Tous les carburants</option>` +
 $('fuel').addEventListener('change', e => {
   fuelIdx = +e.target.value;
   cheapLimit = CHEAP_STEP;
+  engage();
   map.closePopup();
   computeFuelStats();
   render();
