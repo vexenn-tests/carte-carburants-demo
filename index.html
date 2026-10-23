@@ -127,6 +127,26 @@
   .price.none .fuel, .price.none .amount { color: var(--muted); font-weight: 400; }
   .vs { grid-column: 1 / -1; font-size: 11px; color: var(--text-secondary); margin-top: -3px; }
 
+  .cheap { margin-top: 10px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+  .cheap-title { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+  .cheap-list { list-style: none; margin: 0; padding: 0; }
+  .cheap-list li + li { border-top: 1px solid var(--line); }
+  .cheap-row { width: 100%; display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px; padding: 8px 6px;
+    font: inherit; color: inherit; text-align: left; background: none; border: 0; border-radius: 8px; cursor: pointer; }
+  .cheap-list.all .cheap-row { grid-template-columns: 56px 1fr auto; }
+  .cheap-row:hover { background: var(--accent-soft); }
+  .cheap-row:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+  .cheap-rank { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%;
+    font-size: 12px; font-weight: 700; color: #fff; }
+  .cheap-tag { font-size: 12px; font-weight: 700; color: var(--brand); }
+  .cheap-who { min-width: 0; }
+  .cheap-who b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cheap-who small { display: block; color: var(--text-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cheap-price { text-align: right; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .cheap-price small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+  .cheap-empty { color: var(--text-secondary); padding: 6px; }
+  .cheap-more { margin-top: 6px; font: inherit; font-size: 13px; font-weight: 700; color: var(--accent-ink); background: none; border: 0; padding: 6px; cursor: pointer; }
+  .cheap-more[hidden] { display: none; }
   .sources { color: var(--muted); font-size: 11px; line-height: 1.5; margin-top: 10px; }
   .sources a { color: inherit; }
   .error { color: var(--critical); }
@@ -168,6 +188,12 @@
       <div class="d">&nbsp;</div>
     </button>
   </div>
+
+  <section class="cheap" aria-live="polite">
+    <h2 class="cheap-title" id="cheap-title">Les moins chers dans la zone</h2>
+    <ol class="cheap-list" id="cheap-list"></ol>
+    <button class="cheap-more" id="cheap-more" hidden>Afficher plus</button>
+  </section>
 
   <p class="sources">
     <span id="maj"></span>
@@ -291,6 +317,7 @@ function updateZone() {
   const inZone = shown.filter(s => b.contains(s.marker.getLatLng()));
   $('summary').innerHTML = `<b>${fmt(inZone.length)}</b> station${inZone.length > 1 ? 's' : ''} dans la zone`;
   zoneMin = zoneMax = null;
+  renderCheap(inZone);
 
   const cards = [['st-avg'], ['st-min'], ['st-max']].map(([id]) => $(id));
   if (ALL()) {
@@ -341,6 +368,56 @@ for (const [id, get] of [['st-min', () => zoneMin], ['st-max', () => zoneMax]]) 
     if (s) clusters.zoomToShowLayer(s.marker, () => s.marker.openPopup());
   });
 }
+
+const CHEAP_STEP = 10;
+let cheapLimit = CHEAP_STEP, cheapItems = [];
+
+function cheapRow(i, lead, s, fi) {
+  const maj = s.maj[fi];
+  return `<li><button class="cheap-row" data-i="${i}">
+    ${lead}
+    <span class="cheap-who"><b>${esc(s.ville || 'Commune inconnue')} (${esc(s.cp)})</b><small>${esc(s.adresse)}</small></span>
+    <span class="cheap-price">${euro(s.prix[fi]).replace(' €', '')} <small>€/L · ${ago(maj)}</small></span>
+  </button></li>`;
+}
+
+function renderCheap(inZone) {
+  let rows = [];
+  if (ALL()) {
+    $('cheap-title').textContent = 'Le moins cher par carburant dans la zone';
+    FUELS.forEach(([, label], fi) => {
+      const fresh = inZone.filter(s => isFresh(s, fi));
+      if (!fresh.length) return;
+      const s = fresh.reduce((a, b) => b.prix[fi] < a.prix[fi] ? b : a);
+      rows.push({ s, html: i => cheapRow(i, `<span class="cheap-tag">${label}</span>`, s, fi) });
+    });
+    $('cheap-more').hidden = true;
+  } else {
+    $('cheap-title').textContent = `${FUELS[fuelIdx][1]} : les moins chers dans la zone`;
+    const fresh = inZone.filter(s => isFresh(s)).sort((a, b) => price(a) - price(b));
+    rows = fresh.slice(0, cheapLimit).map((s, k) => ({
+      s, html: i => cheapRow(i, `<span class="cheap-rank" style="background:${colorFor(price(s))};color:${LIGHT_BINS.has(colorFor(price(s))) ? '#0b0b0b' : '#fff'}">${k + 1}</span>`, s, fuelIdx),
+    }));
+    $('cheap-more').hidden = fresh.length <= cheapLimit;
+  }
+  $('cheap-list').classList.toggle('all', ALL());
+  cheapItems = rows.map(r => r.s);
+  $('cheap-list').innerHTML = rows.length
+    ? rows.map((r, i) => r.html(i)).join('')
+    : '<li class="cheap-empty">Aucun prix récent dans la zone</li>';
+}
+
+$('cheap-list').addEventListener('click', e => {
+  const b = e.target.closest('.cheap-row');
+  if (!b) return;
+  const s = cheapItems[+b.dataset.i];
+  document.querySelector('.map-box').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  clusters.zoomToShowLayer(s.marker, () => s.marker.openPopup());
+});
+$('cheap-more').addEventListener('click', () => {
+  cheapLimit += CHEAP_STEP;
+  updateZone();
+});
 
 function ago(ms) {
   const h = (Date.now() - ms) / 36e5;
@@ -460,6 +537,7 @@ $('fuel').innerHTML = `<option value="-1">Tous les carburants</option>` +
   FUELS.map(([, label], i) => `<option value="${i}">${label}</option>`).join('');
 $('fuel').addEventListener('change', e => {
   fuelIdx = +e.target.value;
+  cheapLimit = CHEAP_STEP;
   map.closePopup();
   computeFuelStats();
   render();
